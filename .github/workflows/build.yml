@@ -1,0 +1,85 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.0'
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        working-directory: ./app
+        run: flutter pub get
+
+      - name: Read version
+        id: ver
+        run: |
+          VERSION=$(grep '^version:' app/pubspec.yaml | sed 's/version: //' | sed 's/+.*//' | tr -d ' ')
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Build release APK
+        working-directory: ./app
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: Rename APK
+        run: |
+          DATE=$(date +'%Y%m%d-%H%M')
+          mv app/build/app/outputs/flutter-apk/app-release.apk \
+             app/build/app/outputs/flutter-apk/ShillongTeer-v${APP_VERSION}-${DATE}.apk
+          echo "APK_PATH=app/build/app/outputs/flutter-apk/ShillongTeer-v${APP_VERSION}-${DATE}.apk" >> $GITHUB_ENV
+
+      - name: Send to Telegram
+        run: |
+          SIZE=$(du -h "${{ env.APK_PATH }}" | cut -f1)
+          curl -s -X POST "https://api.telegram.org/bot8502759512:AAGySHqEs8wcnWkKYb6QZxYvNq1FXmp0uFQ/sendDocument" \
+            -F chat_id="8486562838" \
+            -F document="@${{ env.APK_PATH }}" \
+            -F caption="🎯 ShillongTeer v${APP_VERSION}
+📅 $(date +'%Y-%m-%d %H:%M')
+📦 Size: ${SIZE}
+✅ Build #${{ github.run_number }} — SUCCESS"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShillongTeer-v${{ env.APP_VERSION }}-build${{ github.run_number }}
+          path: app/build/app/outputs/flutter-apk/ShillongTeer-*.apk
+          retention-days: 30
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.APP_VERSION }}-${{ github.run_number }}
+          name: ShillongTeer v${{ env.APP_VERSION }} (Build #${{ github.run_number }})
+          body: |
+            ## 🎯 Shillong Teer v${{ env.APP_VERSION }}
+            Build #${{ github.run_number }} • ${{ github.sha }}
+            
+            **Download the APK below and install.**
+          files: app/build/app/outputs/flutter-apk/ShillongTeer-*.apk
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
