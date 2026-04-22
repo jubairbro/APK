@@ -1,4 +1,4 @@
-name: Auto Download APK
+name: Auto Download Multiple APKs
 
 on:
   push:
@@ -16,24 +16,28 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Create folder and Download APK from Private Repo
+      - name: Create folders and Download APKs from Other Account
         env:
-          GITHUB_TOKEN: ${{ secrets.MY_PAT }}
+          GITHUB_TOKEN: ${{ secrets.MY_PAT }} # এখানে আপনার নতুন টোকেনটি কাজ করবে
         run: |
-          mkdir -p download
+          # দুটি আলাদা ফোল্ডার তৈরি করা হচ্ছে
+          mkdir -p download/debug
+          mkdir -p download/release
           
-          # নতুন ভার্সন v1.5.5 ডাউনলোড করার কমান্ড
-          gh release download v1.5.5 --repo jubairbro/Muhasabah-app --pattern "Muhasabah-v1.5.5.apk" --dir download/
+          # ১. Debug ভার্সন ডাউনলোড (JubairZ অ্যাকাউন্ট থেকে)
+          gh release download v1.7.0 --repo JubairZ/Muhasabah-app --pattern "Muhasabah-DEBUG-v1.7.0.apk" --dir download/debug/
+          
+          # ২. Release ভার্সন ডাউনলোড (JubairZ অ্যাকাউন্ট থেকে)
+          gh release download v1.7.0 --repo JubairZ/Muhasabah-app --pattern "Muhasabah-v1.7.0.apk" --dir download/release/
 
       - name: Commit and Push to Repository
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # নতুন ফাইলটি অ্যাড করা হচ্ছে
-          git add download/Muhasabah-v1.5.5.apk
+          # নতুন দুটি ফাইলই গিট-এ অ্যাড করা হচ্ছে
+          git add download/debug/Muhasabah-DEBUG-v1.7.0.apk
+          git add download/release/Muhasabah-v1.7.0.apk
           
-          # কমিট মেসেজ আপডেট
-          git commit -m "Auto added Muhasabah v1.5.5 APK" || echo "No new file to commit"
-          
+          git commit -m "Added v1.7.0 Debug and Release APKs from JubairZ repo" || echo "No new files to commit"
           git push
